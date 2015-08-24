@@ -189,18 +189,18 @@ class AsyncLingerClient:
         return json_decode(resp.body)
 
     @coroutine
-    def get(self, channel, pick=False):
+    def get(self, channel, nowait=False):
         """Get a message from the channel.
 
         Returns the a dict with the message id, body, channel, etc.
         If no message is available, None is returned.
 
-        Set argument `pick` to True to prevent prevent long-polling.
+        Set argument `nowait` to True to prevent long-polling.
         """
         self._test_closed()
         url = '/'.join([self._url, 'channels', channel])
-        if pick:
-            url = ''.join([url, '?pick'])
+        if nowait:
+            url = ''.join([url, '?nowait'])
         resp = yield self._http.fetch(url)
         if not resp.body:
             return None
