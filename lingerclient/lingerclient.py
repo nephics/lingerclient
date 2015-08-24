@@ -5,17 +5,97 @@ Licensed under the Apache License, Version 2.0
 """
 
 import functools
+import logging
+import time
 
-from tornado.gen import coroutine
+from tornado.gen import coroutine, Future
 from tornado.ioloop import IOLoop
 from tornado.escape import json_encode, json_decode
-from tornado.httpclient import AsyncHTTPClient
+from tornado.httpclient import AsyncHTTPClient, HTTPError
 
 
 __all__ = ["AsyncLingerClient", "BlockingLingerClient"]
 
 
 __version__ = '0.1.0'
+
+
+clog = logging.getLogger("linger")
+
+
+class AsyncStream:
+
+    def __init__(self, client, channel, max_retries=0):
+        self.client = client
+        self.channel = channel
+        self.max_retries = max_retries
+
+    def _inc(self, message=None):
+        if self.timeout <= 8:
+            self.timeout = 2 * self.timeout
+        self.retries = self.retries + 1
+        if self.max_retries > 0 and self.retries >= self.max_retries:
+            raise HTTPError(code=599, message=message)
+
+    @coroutine
+    def wait(self):
+        f = Future()
+        self.client.io_loop.call_later(
+            self.timeout, lambda: f.set_result(None))
+        return f
+
+    @coroutine
+    def next(self):
+        """Get next message from the channel.
+
+        Returns a dict with the message id, body, channel, etc.
+        """
+        self.timeout = 1000
+        self.retries = 0
+
+        while not self.client._closed:
+            t = time.time()
+            try:
+                msg = yield self.client._get(self.channel)
+            except HTTPError as e:
+                if 300 <= e.code < 500:
+                    raise
+            except Exception as e:
+                # probably DNS error
+                s = 'Connection error: {}'.format(e)
+                clog.debug(s)
+                yield self.wait()
+                self._inc(s)
+                continue
+
+            if msg:
+                self.timeout = 1
+                self.retries = 0
+                return msg
+
+            t = time.time() - t
+            if t < 0.1:
+                # that's very fast! (probably connection error)
+                s = 'Connection dropping fast. Request time: {}s'.format(t)
+                clog.debug(s)
+                yield self.wait()
+                self._inc(s)
+
+    def __iter__(self):
+        return self
+
+    __next__ = next
+
+
+class BlockingStream(AsyncStream):
+
+    def __init__(self, client, channel, max_retries=0):
+        super().__init__(client, channel, max_retries)
+
+    def next(self):
+        return self.client.io_loop.run_sync(super().next)
+
+    __next__ = next
 
 
 class AsyncLingerClient:
@@ -84,17 +164,23 @@ class AsyncLingerClient:
     def close(self):
         """Closes the Linger client, freeing any resources used."""
         if not self._closed:
-            self._client.close()
+            self._http.close()
             self._closed = True
+
+    def _test_closed(self):
+        if self._closed:
+            raise RuntimeError('Client is closed.')
 
     @coroutine
     def channels(self):
+        self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'channels']))
         return json_decode(resp.body)
 
     @coroutine
     def post(self, channel, body):
         """Post a message in the channel."""
+        self._test_closed()
         data = self._encode(body)
         resp = yield self._http.fetch(
             '/'.join([self._url, 'channels', channel]),
@@ -111,6 +197,7 @@ class AsyncLingerClient:
 
         Set argument `pick` to True to prevent prevent long-polling.
         """
+        self._test_closed()
         url = '/'.join([self._url, 'channels', channel])
         if pick:
             url = ''.join([url, '?pick'])
@@ -131,9 +218,21 @@ class AsyncLingerClient:
         }
         return msg
 
+    # provide access to the AsyncLingerClient.get in the BlockingLingerClient
+    _get = get
+
+    def stream(self, channel, max_retries=0):
+        """Get a stream (iterator) for channel.
+
+        Argument max_retries can limit the number of failed reconnection
+        attempts. Default is max_retries=0, which means no limit.
+        """
+        return AsyncStream(self, channel, max_retries)
+
     @coroutine
     def channel_topics(self, channel):
         """List topics the channel is subscribed to"""
+        self._test_closed()
         resp = yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics']))
         return json_decode(resp.body)
@@ -141,6 +240,7 @@ class AsyncLingerClient:
     @coroutine
     def channel_subscribe(self, channel, topic):
         """Subscribe channel to topic"""
+        self._test_closed()
         yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics', topic]),
             method='PUT')
@@ -148,6 +248,7 @@ class AsyncLingerClient:
     @coroutine
     def channel_unsubscribe(self, channel, topic):
         """Unsubscribe channel from topic"""
+        self._test_closed()
         yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics', topic]),
             method='DELETE')
@@ -155,12 +256,14 @@ class AsyncLingerClient:
     @coroutine
     def topics(self):
         """List topics"""
+        self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'topics']))
         return json_decode(resp.body)
 
     @coroutine
     def publish(self, topic, body):
         """Publish message on topic"""
+        self._test_closed()
         data = self._encode(body)
         resp = yield self._http.fetch(
             '/'.join([self._url, 'topics', topic]),
@@ -171,6 +274,7 @@ class AsyncLingerClient:
     @coroutine
     def topic_channels(self, topic):
         """List channels subscribed to topic"""
+        self._test_closed()
         resp = yield self._http.fetch('/'.join([
             self._url, 'topics', topic, 'channels']))
         return json_decode(resp.body)
@@ -178,12 +282,14 @@ class AsyncLingerClient:
     @coroutine
     def delete(self, msg_id):
         """Delete message"""
+        self._test_closed()
         yield self._http.fetch('/'.join([self._url, 'messages', str(msg_id)]),
                                method='DELETE')
 
     @coroutine
     def stats(self, topic):
         """Get server stats"""
+        self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'stats']))
         return json_decode(resp.body)
 
@@ -228,14 +334,22 @@ class BlockingLingerClient(AsyncLingerClient):
         """
 
         io_loop = IOLoop(make_current=False)
-        AsyncLingerClient.__init__(self, linger_url, encode, decode,
-                                   content_type, io_loop, **request_args)
+        super().__init__(linger_url, encode, decode, content_type, io_loop,
+                         **request_args)
 
     def close(self):
         """Closes the Linger client, freeing any resources used."""
         if not self._closed:
-            AsyncLingerClient.close(self)
+            super().close()
             self.io_loop.close()
+
+    def stream(self, channel, max_retries=0):
+        """Get a stream (iterator) for channel.
+
+        Argument max_retries can limit the number of failed reconnection
+        attempts. Default is max_retries=0, which means no limit.
+        """
+        return BlockingStream(self, channel, max_retries)
 
     def __getattribute__(self, name):
         try:
@@ -244,7 +358,7 @@ class BlockingLingerClient(AsyncLingerClient):
             raise AttributeError("'{}' object has no attribute '{}'".format(
                                  self.__class__.__name__, name))
 
-        if name == 'close' or name.startswith('_') or not hasattr(
+        if name in ('close', 'stream') or name.startswith('_') or not hasattr(
                 attr, '__call__'):
             # a 'local' or internal attribute, or a non-callable
             return attr
@@ -255,4 +369,5 @@ class BlockingLingerClient(AsyncLingerClient):
         def wrapper(clb, *args, **kwargs):
             fn = functools.partial(clb, *args, **kwargs)
             return self.io_loop.run_sync(fn)
+
         return functools.partial(wrapper, attr)
