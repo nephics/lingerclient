@@ -287,7 +287,7 @@ class AsyncLingerClient:
                                method='DELETE')
 
     @coroutine
-    def stats(self, topic):
+    def stats(self):
         """Get server stats"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'stats']))
