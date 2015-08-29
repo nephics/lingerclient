@@ -15,7 +15,8 @@ from tornado.escape import json_encode, json_decode
 from tornado.httpclient import AsyncHTTPClient, HTTPError
 
 
-__all__ = ["AsyncLingerClient", "BlockingLingerClient"]
+__all__ = ["AsyncLingerClient", "BlockingLingerClient",
+           "AsyncStream", "BlockingStream"]
 
 
 __version__ = '0.1.0'
