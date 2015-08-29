@@ -58,6 +58,7 @@ class AsyncStream:
 
         while not self.client._closed:
             t = time.time()
+            msg = None
             try:
                 msg = yield self.client._get(self.channel)
             except HTTPError as e:
