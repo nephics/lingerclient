@@ -172,6 +172,10 @@ class AsyncLingerClient:
             self._http.close()
             self._closed = True
 
+    @property
+    def closed(self):
+        return self._closed
+
     def _test_closed(self):
         if self._closed:
             raise RuntimeError('Client is closed.')
