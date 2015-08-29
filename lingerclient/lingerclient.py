@@ -13,6 +13,7 @@ from tornado.gen import coroutine, Future
 from tornado.ioloop import IOLoop
 from tornado.escape import json_encode, json_decode
 from tornado.httpclient import AsyncHTTPClient, HTTPError
+from tornado.httputil import url_concat
 
 
 __all__ = ["AsyncLingerClient", "BlockingLingerClient",
@@ -182,16 +183,20 @@ class AsyncLingerClient:
         return json_decode(resp.body)
 
     @coroutine
-    def post(self, channel, body):
-        """Post a message in the channel."""
+    def post(self, channel, body, **kwargs):
+        """Post a message in the channel.
+
+        Accepts keyword arguments for the query parameters: priority, timeout,
+        deliver and linger.
+        """
         self._test_closed()
+        url = url_concat('/'.join([self._url, 'channels', channel]), kwargs)
         data = self._encode(body)
         req_args = copy.deepcopy(self.request_args)
         req_args.setdefault('headers', {}).update(
             {'Content-Type': self._content_type})
-        resp = yield self._http.fetch(
-            '/'.join([self._url, 'channels', channel]),
-            method='POST', body=data, **req_args)
+        resp = yield self._http.fetch(url, method='POST', body=data,
+                                      **req_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -245,12 +250,16 @@ class AsyncLingerClient:
         return json_decode(resp.body)
 
     @coroutine
-    def channel_subscribe(self, channel, topic):
-        """Subscribe channel to topic"""
+    def channel_subscribe(self, channel, topic, **kwargs):
+        """Subscribe channel to topic.
+
+        Accepts keyword arguments for the query parameters: priority, timeout,
+        deliver and linger.
+        """
         self._test_closed()
-        yield self._http.fetch('/'.join([
-            self._url, 'channels', channel, 'topics', topic]),
-            method='PUT', **self.request_args)
+        url = url_concat('/'.join([
+            self._url, 'channels', channel, 'topics', topic]), kwargs)
+        yield self._http.fetch(url, method='PUT', **self.request_args)
 
     @coroutine
     def channel_unsubscribe(self, channel, topic):
