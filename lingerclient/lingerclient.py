@@ -32,23 +32,35 @@ class AsyncStream:
         self.client = client
         self.channel = channel
         self.max_retries = max_retries
+        self._clear()
 
     def _inc(self, message=None):
-        if self.timeout <= 8:
+        if self.timeout < 60:
             self.timeout = 2 * self.timeout
+        else:
+            # wait a minute before re-connecting
+            self.timeout = 60
         self.retries = self.retries + 1
         if self.max_retries > 0 and self.retries >= self.max_retries:
             raise HTTPError(code=599, message=message)
+
+    def _clear(self):
+        self.timeout = 0.5
+        self.retries = 0
 
     @property
     def closed(self):
         return self.client.closed
 
-    @coroutine
-    def _wait(self):
+    def _wait(self, message):
         f = Future()
-        self.client.io_loop.call_later(
-            self.timeout, lambda: f.set_result(None))
+        try:
+            self._inc(message)
+        except Exception as e:
+            f.set_exception(e)
+        else:
+            self.client.io_loop.call_later(
+                self.timeout, lambda: f.set_result(None))
         return f
 
     @coroutine
@@ -57,9 +69,6 @@ class AsyncStream:
 
         Returns a dict with the message id, body, channel, etc.
         """
-        self.timeout = 1000
-        self.retries = 0
-
         while not self.closed:
             t = time.time()
             msg = None
@@ -69,16 +78,14 @@ class AsyncStream:
                 if 300 <= e.code < 500:
                     raise
             except Exception as e:
-                # probably DNS error
+                # probably DNS error, or Linger server offline
                 s = 'Connection error: {}'.format(e)
                 clog.debug(s)
-                yield self._wait()
-                self._inc(s)
+                yield self._wait(s)
                 continue
 
             if msg:
-                self.timeout = 1
-                self.retries = 0
+                self._clear()
                 return msg
 
             t = time.time() - t
@@ -86,8 +93,7 @@ class AsyncStream:
                 # that's very fast! (probably connection error)
                 s = 'Connection dropping fast. Request time: {}s'.format(t)
                 clog.debug(s)
-                yield self._wait()
-                self._inc(s)
+                yield self._wait(s)
 
     def __iter__(self):
         return self
@@ -165,7 +171,7 @@ class AsyncLingerClient:
         self._encode = encode
         self._decode = decode
         self._content_type = content_type
-        self.io_loop = io_loop
+        self.io_loop = io_loop or IOLoop.current()
         self.request_args = request_args
         self._closed = False
         self._http = AsyncHTTPClient(io_loop)
