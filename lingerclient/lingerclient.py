@@ -40,6 +40,10 @@ class AsyncStream:
         if self.max_retries > 0 and self.retries >= self.max_retries:
             raise HTTPError(code=599, message=message)
 
+    @property
+    def closed(self):
+        return self.client.closed
+
     @coroutine
     def wait(self):
         f = Future()
@@ -56,7 +60,7 @@ class AsyncStream:
         self.timeout = 1000
         self.retries = 0
 
-        while not self.client._closed:
+        while not self.closed:
             t = time.time()
             msg = None
             try:
