@@ -211,7 +211,7 @@ class AsyncLingerClient:
         if not resp.body:
             return None
         msg = {
-            'id': resp.headers['x-linger-msg-id'],
+            'id': int(resp.headers['x-linger-msg-id']),
             'channel': resp.headers['x-linger-channel'],
             'priority': resp.headers['x-linger-priority'],
             'timeout': resp.headers['x-linger-timeout'],
