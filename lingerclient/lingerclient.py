@@ -45,7 +45,7 @@ class AsyncStream:
         return self.client.closed
 
     @coroutine
-    def wait(self):
+    def _wait(self):
         f = Future()
         self.client.io_loop.call_later(
             self.timeout, lambda: f.set_result(None))
@@ -72,7 +72,7 @@ class AsyncStream:
                 # probably DNS error
                 s = 'Connection error: {}'.format(e)
                 clog.debug(s)
-                yield self.wait()
+                yield self._wait()
                 self._inc(s)
                 continue
 
@@ -86,7 +86,7 @@ class AsyncStream:
                 # that's very fast! (probably connection error)
                 s = 'Connection dropping fast. Request time: {}s'.format(t)
                 clog.debug(s)
-                yield self.wait()
+                yield self._wait()
                 self._inc(s)
 
     def __iter__(self):
