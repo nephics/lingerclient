@@ -4,6 +4,7 @@ Copyright 2015 Jacob Sondergaard
 Licensed under the Apache License, Version 2.0
 """
 
+import copy
 import functools
 import logging
 import time
@@ -158,6 +159,7 @@ class AsyncLingerClient:
         self._decode = decode
         self._content_type = content_type
         self.io_loop = io_loop
+        self.request_args = request_args
         self._closed = False
         self._http = AsyncHTTPClient(io_loop)
 
@@ -174,7 +176,8 @@ class AsyncLingerClient:
     @coroutine
     def channels(self):
         self._test_closed()
-        resp = yield self._http.fetch('/'.join([self._url, 'channels']))
+        resp = yield self._http.fetch('/'.join([self._url, 'channels']),
+                                      **self.request_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -182,10 +185,12 @@ class AsyncLingerClient:
         """Post a message in the channel."""
         self._test_closed()
         data = self._encode(body)
+        req_args = copy.deepcopy(self.request_args)
+        req_args.setdefault('headers', {}).update(
+            {'Content-Type': self._content_type})
         resp = yield self._http.fetch(
             '/'.join([self._url, 'channels', channel]),
-            headers={'Content-Type': self._content_type},
-            method='POST', body=data)
+            method='POST', body=data, **req_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -201,7 +206,7 @@ class AsyncLingerClient:
         url = '/'.join([self._url, 'channels', channel])
         if nowait:
             url = ''.join([url, '?nowait'])
-        resp = yield self._http.fetch(url)
+        resp = yield self._http.fetch(url, **self.request_args)
         if not resp.body:
             return None
         msg = {
@@ -234,7 +239,8 @@ class AsyncLingerClient:
         """List topics the channel is subscribed to"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([
-            self._url, 'channels', channel, 'topics']))
+            self._url, 'channels', channel, 'topics']),
+            **self.request_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -243,7 +249,7 @@ class AsyncLingerClient:
         self._test_closed()
         yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics', topic]),
-            method='PUT')
+            method='PUT', **self.request_args)
 
     @coroutine
     def channel_unsubscribe(self, channel, topic):
@@ -251,13 +257,14 @@ class AsyncLingerClient:
         self._test_closed()
         yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics', topic]),
-            method='DELETE')
+            method='DELETE', **self.request_args)
 
     @coroutine
     def topics(self):
         """List topics"""
         self._test_closed()
-        resp = yield self._http.fetch('/'.join([self._url, 'topics']))
+        resp = yield self._http.fetch('/'.join([self._url, 'topics']),
+                                      **self.request_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -265,10 +272,12 @@ class AsyncLingerClient:
         """Publish message on topic"""
         self._test_closed()
         data = self._encode(body)
+        req_args = copy.deepcopy(self.request_args)
+        req_args.setdefault('headers', {}).update(
+            {'Content-Type': self._content_type})
         resp = yield self._http.fetch(
             '/'.join([self._url, 'topics', topic]),
-            headers={'Content-Type': self._content_type},
-            method='POST', body=data)
+            method='POST', body=data, **req_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -276,7 +285,8 @@ class AsyncLingerClient:
         """List channels subscribed to topic"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([
-            self._url, 'topics', topic, 'channels']))
+            self._url, 'topics', topic, 'channels']),
+            **self.request_args)
         return json_decode(resp.body)
 
     @coroutine
@@ -284,13 +294,14 @@ class AsyncLingerClient:
         """Delete message"""
         self._test_closed()
         yield self._http.fetch('/'.join([self._url, 'messages', str(msg_id)]),
-                               method='DELETE')
+                               method='DELETE', **self.request_args)
 
     @coroutine
     def stats(self):
         """Get server stats"""
         self._test_closed()
-        resp = yield self._http.fetch('/'.join([self._url, 'stats']))
+        resp = yield self._http.fetch('/'.join([self._url, 'stats']),
+                                      **self.request_args)
         return json_decode(resp.body)
 
 
