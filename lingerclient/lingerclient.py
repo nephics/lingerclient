@@ -274,7 +274,8 @@ class AsyncLingerClient:
         self._test_closed()
         url = url_concat('/'.join([
             self._url, 'channels', channel, 'topics', topic]), kwargs)
-        yield self._http.fetch(url, method='PUT', **self.request_args)
+        yield self._http.fetch(url, method='PUT', body=b'',
+                               **self.request_args)
 
     @coroutine
     def channel_unsubscribe(self, channel, topic):
