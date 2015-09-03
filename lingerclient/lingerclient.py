@@ -177,7 +177,7 @@ class AsyncLingerClient:
         self._content_type = content_type
         self.io_loop = io_loop or IOLoop.current()
         if 'request_timeout' not in request_args:
-            request_args['request_timeout'] = 120.0
+            request_args['request_timeout'] = 135.0
         self.request_args = request_args
         self._closed = False
         self._http = AsyncHTTPClient(io_loop)
