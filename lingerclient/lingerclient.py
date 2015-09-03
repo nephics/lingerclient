@@ -233,12 +233,12 @@ class AsyncLingerClient:
         msg = {
             'id': int(resp.headers['x-linger-msg-id']),
             'channel': resp.headers['x-linger-channel'],
-            'priority': resp.headers['x-linger-priority'],
-            'timeout': resp.headers['x-linger-timeout'],
-            'linger': resp.headers['x-linger-linger'],
-            'deliver': resp.headers['x-linger-deliver'],
-            'delivered': resp.headers['x-linger-delivered'],
-            'received': resp.headers['x-linger-received'],
+            'priority': int(resp.headers['x-linger-priority']),
+            'timeout': int(resp.headers['x-linger-timeout']),
+            'linger': int(resp.headers['x-linger-linger']),
+            'deliver': int(resp.headers['x-linger-deliver']),
+            'delivered': int(resp.headers['x-linger-delivered']),
+            'received': int(resp.headers['x-linger-received']),
             'topic': resp.headers.get('x-linger-topic', ''),
             'body': self._decode(resp.body)
         }
