@@ -75,11 +75,15 @@ class AsyncStream:
             try:
                 msg = yield self.client._get(self.channel)
             except HTTPError as e:
+                s = 'Request error. {}'.format(e)
+                clog.debug(s)
                 if 300 <= e.code < 500:
                     raise
+                else:
+                    yield self._wait(s)
             except Exception as e:
                 # probably DNS error, or Linger server offline
-                s = 'Connection error: {}'.format(e)
+                s = 'Connection error. {}'.format(e)
                 clog.debug(s)
                 yield self._wait(s)
                 continue
