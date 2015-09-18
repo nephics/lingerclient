@@ -141,7 +141,7 @@ class AsyncLingerClient:
     is raised at the callpoint.
     """
 
-    def __init__(self, linger_url='http://127.0.0.1:8989/', encode=json_encode,
+    def __init__(self, linger_url=None, encode=json_encode,
                  decode=json_decode, content_type='application/json',
                  io_loop=None, **request_args):
         """Creates an `AsyncLingerClient`.
@@ -168,6 +168,8 @@ class AsyncLingerClient:
         for basic authentication. See `tornado.httpclient.HTTPRequest` for
         other possible arguments.
         """
+        if not linger_url:
+            linger_url = 'http://127.0.0.1:8989/'
         if linger_url.endswith('/'):
             self._url = linger_url.rstrip('/')
         else:
@@ -359,7 +361,7 @@ class BlockingLingerClient(AsyncLingerClient):
     Linger are run in a seperate IOLoop.
     """
 
-    def __init__(self, linger_url='http://127.0.0.1:8989/', encode=json_encode,
+    def __init__(self, linger_url=None, encode=json_encode,
                  decode=json_decode, content_type='application/json',
                  io_loop=None, **request_args):
         """Creates a `BlockingLingerClient`.
@@ -375,6 +377,8 @@ class BlockingLingerClient(AsyncLingerClient):
         for basic authentication. See `tornado.httpclient.HTTPRequest` for
         other possible arguments.
         """
+        if not linger_url:
+            linger_url = 'http://127.0.0.1:8989/'
 
         io_loop = IOLoop(make_current=False)
         super().__init__(linger_url, encode, decode, content_type, io_loop,
