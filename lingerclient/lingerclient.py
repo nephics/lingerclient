@@ -171,7 +171,7 @@ class AsyncLingerClient:
         if linger_url.endswith('/'):
             self._url = linger_url.rstrip('/')
         else:
-            self.url = linger_url
+            self._url = linger_url
         self._encode = encode
         self._decode = decode
         self._content_type = content_type
