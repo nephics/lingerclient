@@ -1,6 +1,6 @@
 """Blocking and non-blocking (asynchronous) clients for Linger
 
-Copyright 2015 Jacob Sondergaard
+Copyright 2015-2017 Nephics AB
 Licensed under the Apache License, Version 2.0
 """
 
