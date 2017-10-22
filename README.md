@@ -14,7 +14,7 @@ Install the `lingerclient` package with the following pip command:
 
 This will also ensure that the dependency package `tornado` is installed.
 
-## Client methods
+## Main client methods
 
 *`channels()`*  
 List active channels
@@ -59,7 +59,7 @@ Delete message
 *`stats()`*  
 Get server stats
 
-## Client methods
+## Other client methods
 
 *`__init__(linger_url=None, encode=json_encode, decode=json_decode, content_type='application/json', io_loop=None, **request_args)`*
 Create an `AsyncLingerClient`.
