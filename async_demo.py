@@ -12,4 +12,5 @@ def run_test():
     m = yield lc.get('test-channel')
     yield lc.delete(m['id'])
 
+
 ioloop.IOLoop.current().run_sync(run_test)

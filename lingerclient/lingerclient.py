@@ -17,13 +17,17 @@ from tornado.httputil import url_concat
 
 
 __all__ = ["AsyncLingerClient", "BlockingLingerClient",
-           "AsyncStream", "BlockingStream"]
+           "AsyncStream", "BlockingStream", "LingerClientError"]
 
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 
 clog = logging.getLogger("linger")
+
+
+class LingerClientError(HTTPError):
+    pass
 
 
 class AsyncStream:
@@ -169,7 +173,7 @@ class AsyncLingerClient:
         other possible arguments.
         """
         if not linger_url:
-            linger_url = 'http://127.0.0.1:8989/'
+            linger_url = 'http://127.0.0.1:8989'
         if linger_url.endswith('/'):
             self._url = linger_url.rstrip('/')
         else:
@@ -192,6 +196,7 @@ class AsyncLingerClient:
 
     @property
     def closed(self):
+        """Boolean indicating if the Linger client is closed."""
         return self._closed
 
     def _test_closed(self):
@@ -200,10 +205,14 @@ class AsyncLingerClient:
 
     @coroutine
     def channels(self):
+        """List active channels"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'channels']),
                                       **self.request_args)
-        return json_decode(resp.body)
+        if resp.code != 200:
+            raise LingerClientError(resp.code, resp.reason, resp)
+        jresp = json_decode(resp.body)
+        return jresp['channels']
 
     @coroutine
     def post(self, channel, body, **kwargs):
@@ -220,7 +229,10 @@ class AsyncLingerClient:
             {'Content-Type': self._content_type})
         resp = yield self._http.fetch(url, method='POST', body=data,
                                       **req_args)
-        return json_decode(resp.body)
+        if resp.code != 202:
+            raise LingerClientError(resp.code, resp.reason, resp)
+        jresp = json_decode(resp.body)
+        return jresp['id']
 
     @coroutine
     def get(self, channel, nowait=False):
@@ -238,6 +250,8 @@ class AsyncLingerClient:
         resp = yield self._http.fetch(url, **self.request_args)
         if not resp.body:
             return None
+        if resp.code != 200:
+            raise LingerClientError(resp.code, resp.reason, resp)
         msg = {
             'id': int(resp.headers['x-linger-msg-id']),
             'channel': resp.headers['x-linger-channel'],
@@ -248,7 +262,8 @@ class AsyncLingerClient:
             'delivered': int(resp.headers['x-linger-delivered']),
             'received': int(resp.headers['x-linger-received']),
             'topic': resp.headers.get('x-linger-topic', ''),
-            'body': self._decode(resp.body)
+            'body': self._decode(resp.body),
+            'mimetype': resp.headers.get('Content-Type')
         }
         return msg
 
@@ -264,16 +279,37 @@ class AsyncLingerClient:
         return AsyncStream(self, channel, max_retries)
 
     @coroutine
-    def channel_topics(self, channel):
+    def drain(self, channel):
+        """Drain the channel"""
+        self._test_closed()
+        resp = yield self._http.fetch('/'.join([
+            self._url, 'channels', channel]), method='DELETE',
+            **self.request_args)
+        return resp.code == 204
+
+    @coroutine
+    def channel_stats(self, channel):
+        """Get channel stats"""
+        self._test_closed()
+        resp = yield self._http.fetch('/'.join([
+            self._url, 'channels', channel, 'stats']),
+            **self.request_args)
+        return json_decode(resp.body)
+
+    @coroutine
+    def subscriptions(self, channel):
         """List topics the channel is subscribed to"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics']),
             **self.request_args)
-        return json_decode(resp.body)
+        if resp.code != 200:
+            raise LingerClientError(resp.code, resp.reason, resp)
+        jresp = json_decode(resp.body)
+        return jresp['topics']
 
     @coroutine
-    def channel_subscribe(self, channel, topic, **kwargs):
+    def subscribe(self, channel, topic, **kwargs):
         """Subscribe channel to topic.
 
         Accepts keyword arguments for the query parameters: priority, timeout,
@@ -282,24 +318,29 @@ class AsyncLingerClient:
         self._test_closed()
         url = url_concat('/'.join([
             self._url, 'channels', channel, 'topics', topic]), kwargs)
-        yield self._http.fetch(url, method='PUT', body=b'',
-                               **self.request_args)
+        resp = yield self._http.fetch(url, method='PUT', body=b'',
+                                      **self.request_args)
+        return resp.code == 204
 
     @coroutine
-    def channel_unsubscribe(self, channel, topic):
+    def unsubscribe(self, channel, topic):
         """Unsubscribe channel from topic"""
         self._test_closed()
-        yield self._http.fetch('/'.join([
+        resp = yield self._http.fetch('/'.join([
             self._url, 'channels', channel, 'topics', topic]),
             method='DELETE', **self.request_args)
+        return resp.code == 204
 
     @coroutine
     def topics(self):
-        """List topics"""
+        """List all topics"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([self._url, 'topics']),
                                       **self.request_args)
-        return json_decode(resp.body)
+        if resp.code != 200:
+            raise LingerClientError(resp.code, resp.reason, resp)
+        jresp = json_decode(resp.body)
+        return jresp['topics']
 
     @coroutine
     def publish(self, topic, body):
@@ -312,23 +353,30 @@ class AsyncLingerClient:
         resp = yield self._http.fetch(
             '/'.join([self._url, 'topics', topic]),
             method='POST', body=data, **req_args)
+        if resp.code != 202:
+            raise LingerClientError(resp.code, resp.reason, resp)
         return json_decode(resp.body)
 
     @coroutine
-    def topic_channels(self, topic):
+    def subscribers(self, topic):
         """List channels subscribed to topic"""
         self._test_closed()
         resp = yield self._http.fetch('/'.join([
             self._url, 'topics', topic, 'channels']),
             **self.request_args)
-        return json_decode(resp.body)
+        if resp.code != 200:
+            raise LingerClientError(resp.code, resp.reason, resp)
+        jresp = json_decode(resp.body)
+        return jresp['channels']
 
     @coroutine
     def delete(self, msg_id):
         """Delete message"""
         self._test_closed()
-        yield self._http.fetch('/'.join([self._url, 'messages', str(msg_id)]),
-                               method='DELETE', **self.request_args)
+        resp = yield self._http.fetch('/'.join([
+            self._url, 'messages', str(msg_id)]),
+            method='DELETE', **self.request_args)
+        return resp.code == 204
 
     @coroutine
     def stats(self):
