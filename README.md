@@ -10,7 +10,7 @@ The linger clients are implemented in Python 3 using [Tornado](http://www.tornad
 
 Install the `lingerclient` package with the following pip command:
 
-    pip install https://github.com/nephics/linger-client/archive/master.zip
+    pip install https://github.com/nephics/lingerclient/archive/master.zip
 
 This will also ensure that the dependency package `tornado` is installed.
 
