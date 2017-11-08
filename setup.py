@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='lingerclient',
-    version='0.2.0',
+    version='0.2.2',
     description="Blocking and non-blocking (asynchronous) clients for Linger",
     author='Jacob Svensson',
     author_email='jacob@nephics.com',

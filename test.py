@@ -245,11 +245,12 @@ class TestMethods(AsyncHTTPTestCase):
         self.kwargs['timeout'] = 1  # hide for only 1 sec
         yield self.client.post(**self.kwargs)
         msg = yield self.client.get(self.kwargs['channel'], nowait=True)
+        self.check_msg(msg, self.kwargs)
 
         # test: message has been purged
         yield sleep(1.2)
-        msg = yield self.client.get(self.kwargs['channel'], nowait=True)
-        self.assertIsNone(msg)
+        msg2 = yield self.client.get(self.kwargs['channel'], nowait=True)
+        self.assertIsNone(msg2)
 
     @gen_test
     def test_priority(self):
@@ -274,6 +275,29 @@ class TestMethods(AsyncHTTPTestCase):
                 self.kwargs['channel'], nowait=True)
             self.assertEqual(msg['priority'], i-1)
             self.assertEqual(int(msg['body']), i)
+
+    @gen_test(timeout=10)
+    def test_touch(self):
+        """Timeout-Touch test"""
+        self.kwargs['timeout'] = 1  # hide for only 1 sec
+        self.client.post(**self.kwargs)
+
+        msg = yield self.client.get(self.kwargs['channel'], nowait=True)
+        self.check_msg(msg, self.kwargs)
+
+        # touch msg 3 times, before it is shown again
+        for _ in range(3):
+            yield sleep(0.9)
+            r = yield self.client.touch(msg['id'])
+            self.assertTrue(r)
+            # test that the message is not delivered (because it is hidden)
+            msg2 = yield self.client.get(self.kwargs['channel'], nowait=True)
+            self.assertIsNone(msg2)
+        yield sleep(1.2)
+        # test that msg is timed out and re-delivered
+        msg3 = yield self.client.get(self.kwargs['channel'], nowait=True)
+        self.assertIsNotNone(msg3)
+        self.assertEqual(msg['id'], msg3['id'])
 
 
 def all():

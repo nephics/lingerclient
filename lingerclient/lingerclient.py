@@ -20,7 +20,7 @@ __all__ = ["AsyncLingerClient", "BlockingLingerClient",
            "AsyncStream", "BlockingStream", "LingerClientError"]
 
 
-__version__ = '0.2.0'
+__version__ = '0.2.2'
 
 
 clog = logging.getLogger("linger")
@@ -368,6 +368,15 @@ class AsyncLingerClient:
             raise LingerClientError(resp.code, resp.reason, resp)
         jresp = json_decode(resp.body)
         return jresp['channels']
+
+    @coroutine
+    def touch(self, msg_id):
+        """Touch message (reset timeout)"""
+        self._test_closed()
+        resp = yield self._http.fetch('/'.join([
+            self._url, 'messages', str(msg_id), 'touch']),
+            body=b'', method='POST', **self.request_args)
+        return resp.code == 204
 
     @coroutine
     def delete(self, msg_id):
