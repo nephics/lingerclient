@@ -14,55 +14,96 @@ Install the `lingerclient` package with the following pip command:
 
 This will also ensure that the dependency package `tornado` is installed.
 
+## Example code
+
+*Blocking client example:*
+
+    import lingerclient
+
+	lc = lingerclient.BlockingLingerClient()
+	r = lc.post('test-channel', {'msg': 'My first message'})
+	print(r)
+	print(lc.channels())
+	m = lc.get('test-channel')
+	lc.delete(m['id'])
+
+The `stream` method can be used for iterating over a stream from a channel:
+
+    for m in lc.stream('test-channel'):
+        print(m['body'])
+        lc.delete(m['id'])
+
+*Async client example:*
+
+import lingerclient
+from tornado import ioloop, gen
+
+
+	@gen.coroutine
+	def run_test():
+	    lc = lingerclient.AsyncLingerClient()
+	    r = yield lc.post('test-channel', {'msg': 'My first message'})
+	    print(r)
+	    r = yield lc.channels()
+	    print(r)
+	    m = yield lc.get('test-channel')
+	    yield lc.delete(m['id'])
+
+
+	ioloop.IOLoop.current().run_sync(run_test)
+
+
 ## Main client methods
 
-*`channels()`*  
+**`channels()`**  
 List active channels
 
-*`post(channel, body, **kwargs)`*  
+**`post(channel, body, **kwargs)`**  
 Post a message in the channel. Accepts keyword arguments for the query parameters: priority, timeout, deliver and linger.
 
 
-*`get(channel, nowait=False)`*  
+**`get(channel, nowait=False)`**  
 Get a message from the channel. Returns the a dict with the message id, body, channel, etc. If no message is available, None is returned. Set argument `nowait` to True to prevent long-polling.
 
-*`stream(channel, max_retries=0)`*  
+**`stream(channel, max_retries=0)`**  
 Get a stream (iterator) for channel. Argument max_retries can limit the number of failed reconnection attempts. Default is max_retries=0, which means no limit.
 
-*`drain(channel)`*  
+**`drain(channel)`**  
 Drain the channel for messages (ie, delete all messages in the channel).
 
-*`channel_stats(channel)`*  
+**`channel_stats(channel)`**  
 Get channel stats
 
-*`subscriptions(channel)`*  
+**`subscriptions(channel)`**  
 List topics the channel is subscribed to
 
-*`subscribe(channel, topic, **kwargs)`*  
+**`subscribe(channel, topic, **kwargs)`**  
 Subscribe channel to topic. Accepts keyword arguments for the query parameters: priority, timeout, deliver and linger
 
-*`unsubscribe(channel, topic)`*  
+**`unsubscribe(channel, topic)`**  
 Unsubscribe channel from topic
 
-*`topics()`*  
+**`topics()`**  
 List all topics
 
-*`publish(topic, body)`*  
+**`publish(topic, body)`**  
 Publish message on topic
 
-*`subscribers(topic)`*  
+**`subscribers(topic)`**  
 List channels subscribed to topic
 
-*`delete(msg_id)`*  
+**`delete(msg_id)`**  
 Delete message
 
-*`stats()`*  
+**`stats()`**  
 Get server stats
 
 ## Other client methods
 
-*`__init__(linger_url=None, encode=json_encode, decode=json_decode, content_type='application/json', io_loop=None, **request_args)`*
-Create an `AsyncLingerClient`.
+
+**`__init__(linger_url=None, encode=json_encode, decode=json_decode, content_type='application/json', io_loop=None, **request_args)`**
+
+The method signature is the same for `AsyncLingerClient` and `BlockingLingerClient`, as BlockingLingerClient is a wrapper for AsyncLingerClient, where each HTTP request to Linger is run in an IOLoop.
 
 All parameters are optional.
 
@@ -78,10 +119,10 @@ Keyword arguments in `request_args` are applied when making requests to Linger. 
 
 The request arguments may include `auth_username` and `auth_password` for basic authentication. See `tornado.httpclient.HTTPRequest` for other possible arguments.
 
-*`close()`*  
+**`close()`**  
 Closes the Linger client, freeing any resources used.
 
-*`closed`* (property)  
+**`closed`** (property)  
 Boolean indicating if the Linger client is closed.
 
 # Support

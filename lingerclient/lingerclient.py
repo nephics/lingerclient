@@ -414,8 +414,8 @@ class BlockingLingerClient(AsyncLingerClient):
     error is returned from Linger, the appropriate tornado.web.HTTPError
     is raised.
 
-    BlockingLingerClient is a wrapper for AsyncLingerClient, http requests to
-    Linger are run in a seperate IOLoop.
+    BlockingLingerClient is a wrapper for AsyncLingerClient, where each HTTP
+    request to Linger is run in an IOLoop.
     """
 
     def __init__(self, linger_url=None, encode=json_encode,
