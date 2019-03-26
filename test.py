@@ -5,8 +5,8 @@ from tornado.gen import sleep
 from tornado.testing import (AsyncHTTPTestCase, gen_test, main as testing_main)
 from tornado.options import options
 
-import linger
 import lingerclient
+from linger import linger
 
 options.logging = None
 
@@ -234,7 +234,7 @@ class TestMethods(AsyncHTTPTestCase):
         yield self.client.post(**self.kwargs)
 
         # test: message has been purged
-        yield sleep(1.4)
+        yield sleep(1.5)
         msg = yield self.client.get(self.kwargs['channel'], nowait=True)
         self.assertIsNone(msg)
 
@@ -248,7 +248,7 @@ class TestMethods(AsyncHTTPTestCase):
         self.check_msg(msg, self.kwargs)
 
         # test: message has been purged
-        yield sleep(1.2)
+        yield sleep(1.5)
         msg2 = yield self.client.get(self.kwargs['channel'], nowait=True)
         self.assertIsNone(msg2)
 
